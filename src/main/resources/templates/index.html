@@ -2,70 +2,248 @@
 <html lang="fr" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>Bibli-Jeu - Recherche</title>
-    <!-- construction du lien vers src/main/resources/static/css/style.css -->
-    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <title>Bibliothèque de Jeux</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 40px;
+            background-color: #121214;
+            color: #e1e1e6;
+        }
+        h1 { color: #00b37e; }
+        .toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 25px;
+            background: #202024;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #29292e;
+        }
+        input, select {
+            padding: 10px;
+            font-size: 16px;
+            background: #29292e;
+            border: 1px solid #323238;
+            color: white;
+            border-radius: 6px;
+            outline: none;
+        }
+        input { width: 250px; }
+        button {
+            padding: 10px 18px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #00b37e;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #00875f; }
+
+        .game-card {
+            background: #202024;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            border: 1px solid #29292e;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .game-info { display: flex; align-items: center; gap: 15px; }
+        img { width: 120px; height: 70px; object-fit: cover; border-radius: 6px; }
+        .actions { display: flex; align-items: center; gap: 10px; }
+    </style>
 </head>
 <body>
-<header>
-    <h1>Bibli-Jeu</h1>
-    <nav>
-        <a th:href="@{/}">Rechercher</a>
-        <a th:href="@{/bibliotheque}">Ma bibliothèque</a>
-    </nav>
-</header>
 
-<main>
-    <section class="carte">
-        <p>Recherche un jeu vidéo par son nom.</p>
+<h1>Notre Application de Jeux Vidéo</h1>
 
-        <!-- Le formulaire envoie GET /?nom=... -->
-        <form th:action="@{/}" method="get">
-            <label for="nom">Nom du jeu :</label>
-            <input type="text" id="nom" name="nom" th:value="${nom}" placeholder="ex : Zelda" required>
-            <button type="submit">Rechercher</button>
-        </form>
+<div class="toolbar">
+    <input type="text" id="searchInput" placeholder="Rechercher un jeu...">
 
-        <p class="message" th:if="${message}" th:text="${message}">Message</p>
-        <p class="erreur" th:if="${erreur}" th:text="${erreur}">Erreur</p>
-        <p th:if="${resultats != null and resultats.isEmpty()}">
-            Aucun jeu trouvé pour « <span th:text="${nom}">zelda</span> ».
-        </p>
-    </section>
+    <select id="filterRating" onchange="applyFiltersAndSort()">
+        <option value="0">Toutes les notes</option>
+        <option value="3">Note > 3.0 / 5</option>
+        <option value="4">Note > 4.0 / 5</option>
+    </select>
 
-    <div class="grille" th:if="${resultats != null}">
-        <div class="carte jeu" th:each="jeu : ${resultats}">
-            <img th:if="${jeu.backgroundImage}" th:src="${jeu.backgroundImage}" th:alt="${jeu.name}">
-            <div th:unless="${jeu.backgroundImage}" class="sans-image">Pas d'image</div>
+    <select id="sortOrder" onchange="applyFiltersAndSort()">
+        <option value="default">Ordre par défaut</option>
+        <option value="az">Nom : A à Z</option>
+        <option value="za">Nom : Z à A</option>
+    </select>
 
-            <h2 th:text="${jeu.name}">Titre du jeu</h2>
-            <table>
-                <tr>
-                    <th>Sortie</th>
-                    <td th:text="${jeu.released != null} ? ${jeu.released} : 'inconnue'">2017-03-03</td>
-                </tr>
-                <tr>
-                    <th>Note</th>
-                    <td th:text="${jeu.rating != null} ? ${jeu.rating} + ' / 5' : '-'">4.5 / 5</td>
-                </tr>
-            </table>
+    <button onclick="searchGames()">Rechercher</button>
+    <button onclick="loadLibrary()" style="background-color: #00875f;">Voir ma bibliothèque</button>
+</div>
 
-            <p class="info" th:if="${dejaAjoutes.contains(jeu.id)}">Déjà dans ta bibliothèque</p>
+<div id="results"></div>
 
+<script th:inline="none">
+    let lastSearchResults = [];
+    let isShowingLibrary = false;
 
-            <form th:unless="${dejaAjoutes.contains(jeu.id)}"
-                  th:action="@{/bibliotheque/ajouter}" method="post">
-                <input type="hidden" name="rawgId" th:value="${jeu.id}">
-                <input type="hidden" name="nomJeu" th:value="${jeu.name}">
-                <input type="hidden" name="imageUrl" th:value="${jeu.backgroundImage}">
-                <input type="hidden" name="dateSortie" th:value="${jeu.released}">
-                <input type="hidden" name="note" th:value="${jeu.rating}">
-                <!-- pour revenir sur la même recherche après l'ajout -->
-                <input type="hidden" name="nom" th:value="${nom}">
-                <button type="submit">Ajouter à ma bibliothèque</button>
-            </form>
-        </div>
-    </div>
-</main>
+    function extractGenres(game) {
+        if (!game) return 'Action / Aventure';
+        if (typeof game.genre === 'string' && game.genre.trim() !== '') return game.genre;
+        if (Array.isArray(game.genres) && game.genres.length > 0) {
+            return game.genres.map(g => (typeof g === 'object' ? (g.name || '') : g)).filter(Boolean).join(', ') || 'Action / Aventure';
+        }
+        return 'Action / Aventure';
+    }
+
+    async function searchGames() {
+        isShowingLibrary = false;
+        const query = document.getElementById('searchInput').value;
+        if (!query) return;
+
+        try {
+            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+            const data = await response.json();
+            lastSearchResults = Array.isArray(data) ? data : (data.results || []);
+            displayGames(lastSearchResults);
+        } catch (error) {
+            console.error("Erreur de recherche :", error);
+        }
+    }
+
+    function displayGames(games) {
+        isShowingLibrary = false;
+        const minRatingInput = document.getElementById('filterRating');
+        const minRating = minRatingInput ? parseFloat(minRatingInput.value) || 0 : 0;
+
+        const sortOrderSelect = document.getElementById('sortOrder');
+        const sortOrder = sortOrderSelect ? sortOrderSelect.value : 'default';
+
+        let filteredGames = games.filter(game => {
+            const gameRating = game.rating ?? game.note ?? 0;
+            return gameRating >= minRating;
+        });
+
+        if (sortOrder === 'az') {
+            filteredGames.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        } else if (sortOrder === 'za') {
+            filteredGames.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+        }
+
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = `<h2>Résultats de recherche (${filteredGames.length})</h2>`;
+
+        if (filteredGames.length === 0) {
+            resultsDiv.innerHTML += '<p>Aucun jeu ne correspond aux critères.</p>';
+            return;
+        }
+
+        filteredGames.forEach(game => {
+            const gameRating = game.rating ?? game.note ?? 0;
+            const gameImage = game.background_image || game.imageUrl || game.image || '';
+            const gameRelease = game.releaseDate || game.released || 'N/A';
+            const genresText = extractGenres(game);
+
+            resultsDiv.innerHTML += `
+                <div class="game-card">
+                    <div class="game-info">
+                        <img src="${gameImage}" alt="Cover">
+                        <div>
+                            <h3>${game.name || 'Titre inconnu'}</h3>
+                            <p><strong>Genre :</strong> ${genresText}</p>
+                            <p>Sortie : ${gameRelease} | Note : ${gameRating}/5</p>
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <button onclick='addGameToLibrary(${JSON.stringify(game)})'>Ajouter</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    function applyFiltersAndSort() {
+        if (isShowingLibrary) {
+            loadLibrary();
+        } else if (lastSearchResults.length > 0) {
+            displayGames(lastSearchResults);
+        }
+    }
+
+    async function addGameToLibrary(game) {
+        game.genre = extractGenres(game);
+
+        try {
+            const response = await fetch('/api/library', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(game)
+            });
+            if (response.ok) {
+                alert(`"${game.name}" a bien été ajouté à votre bibliothèque !`);
+            } else {
+                alert("Erreur lors de l'ajout.");
+            }
+        } catch (error) {
+            console.error("Erreur:", error);
+        }
+    }
+
+    async function loadLibrary() {
+        isShowingLibrary = true;
+        try {
+            const response = await fetch('/api/library');
+            let games = await response.json();
+
+            const sortOrderSelect = document.getElementById('sortOrder');
+            const sortOrder = sortOrderSelect ? sortOrderSelect.value : 'default';
+
+            if (sortOrder === 'az') {
+                games.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            } else if (sortOrder === 'za') {
+                games.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<h2>Ma Bibliothèque Personnelle (${games.length})</h2>`;
+
+            if (games.length === 0) {
+                resultsDiv.innerHTML += '<p>Votre bibliothèque est vide.</p>';
+                return;
+            }
+
+            games.forEach(game => {
+                const gameRating = game.rating ?? game.note ?? 0;
+                const gameImage = game.background_image || game.imageUrl || game.image || '';
+                const gameRelease = game.releaseDate || game.released || 'N/A';
+                const genresText = extractGenres(game);
+
+                resultsDiv.innerHTML += `
+                    <div class="game-card">
+                        <div class="game-info">
+                            <img src="${gameImage}" alt="Cover">
+                            <div>
+                               <h3>${game.name || 'Titre inconnu'}</h3>
+                               <p><strong>Genre :</strong> ${genresText}</p>
+                               <p>Sortie : ${gameRelease} | Note : ${gameRating}/5</p>
+                            </div>
+                        </div>
+                        <button onclick="removeGame(${game.id})" style="background-color: #f75a68;">Supprimer</button>
+                    </div>
+                `;
+            });
+        } catch (error) {
+            console.error("Erreur chargement bibliothèque :", error);
+        }
+    }
+
+    async function removeGame(id) {
+        await fetch(`/api/library/${id}`, { method: 'DELETE' });
+        loadLibrary();
+    }
+</script>
 </body>
 </html>
