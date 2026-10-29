@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bibli-jeu
+  namespace: bibli-jeu
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: bibli-jeu
+  template:
+    metadata:
+      labels:
+        app: bibli-jeu
+    spec:
+      containers:
+        - name: bibli-jeu
+          image: ghcr.io/equipe-ci-cd/bibli-jeu2-backend:351213ff8ada95d2cc0e7f7a351d90f0841b2852
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:h2:file:/app/data/bibliotheque
+            - name: RAWG_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bibli-jeu-secrets
+                  key: RAWG_API_KEY
+          volumeMounts:
+            - name: bibli-jeu-data
+              mountPath: /app/data
+      volumes:
+        - name: bibli-jeu-data
+          persistentVolumeClaim:
+            claimName: bibli-jeu-data

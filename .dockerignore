@@ -1,0 +1,14 @@
+.git
+.github
+.idea
+.vscode
+target
+# La base data ne dois jamais être dans l'image
+data
+k8s
+Rapport
+*.log
+*.md
+compose.yaml
+.env
+.env.*

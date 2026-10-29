@@ -1,0 +1,21 @@
+# Dependabot ouvre une PR chaque semaine quand une dépendance a une nouvelle version.
+# Chaque PR passe dans le pipeline (tests + Trivy) avant d'être fusionnée.
+version: 2
+updates:
+  # Dépendances Java du pom.xml
+  - package-ecosystem: "maven"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Images de base du Dockerfile (eclipse-temurin)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Actions utilisées dans .github/workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

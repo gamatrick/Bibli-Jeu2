@@ -1,0 +1,72 @@
+name: CI Pipeline - Qualité, Tests & Sécurité
+
+on:
+  push:
+    branches: [ "CI", "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  # 1. COMPILATION ET TESTS MAVEN
+  quality-and-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configuration de Java (JDK 25)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'oracle'
+          java-version: '25'
+          cache: 'maven'
+
+      - name: Compilation et Tests unitaires
+        run: mvn clean verify
+
+  # 2. SCAN DE SÉCURITÉ DOCKER (Trivy)
+  security-scan:
+    needs: quality-and-tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Build temporaire de l'image Docker pour le Scan
+        run: docker build -t app-local:${{ github.sha }} .
+
+      - name: Scan de vulnérabilités avec Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'app-local:${{ github.sha }}'
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
+# 3. PUBLICATION DE L'IMAGE DOCKER
+  docker-build-push:
+    needs: security-scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Récupération du code
+        uses: actions/checkout@v4
+
+      - name: Connexion au Registry GitHub (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build et Push de l'image Docker
+        run: |
+          docker build -t ghcr.io/equipe-ci-cd/bibli-jeu2-backend:${{ github.sha }} .
+          docker push ghcr.io/equipe-ci-cd/bibli-jeu2-backend:${{ github.sha }}
