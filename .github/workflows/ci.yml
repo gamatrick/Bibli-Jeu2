@@ -3,6 +3,8 @@ name: CI Pipeline - Qualité, Tests & Sécurité
 on:
   push:
     branches: [ "CI", "main", "master" ]
+    paths-ignore:
+      - 'k8s/**'
   pull_request:
     branches: [ "main", "master" ]
 
@@ -70,3 +72,48 @@ jobs:
         run: |
           docker build -t ghcr.io/equipe-ci-cd/bibli-jeu2-backend:${{ github.sha }} .
           docker push ghcr.io/equipe-ci-cd/bibli-jeu2-backend:${{ github.sha }}
+
+
+  # 4. MISE A JOUR GITOPS VIA PULL REQUEST
+  update-k8s:
+    needs: docker-build-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Recuperation du code
+        uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Mise a jour de l'image Kubernetes
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          sed -i -E \
+            "s|image: ghcr.io/equipe-ci-cd/bibli-jeu2-backend:[^[:space:]]+|image: ghcr.io/equipe-ci-cd/bibli-jeu2-backend:${IMAGE_TAG}|" \
+            k8s/deployment.yaml
+
+          grep 'image:' k8s/deployment.yaml
+
+      - name: Creer une Pull Request GitOps
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(gitops): update Kubernetes image"
+          branch: automation/update-k8s-image
+          delete-branch: true
+          title: "chore(gitops): update Kubernetes image"
+          body: |
+            Mise a jour automatique de l'image Docker Kubernetes.
+
+            Image :
+            ghcr.io/equipe-ci-cd/bibli-jeu2-backend:${{ github.sha }}
+
+            Cette Pull Request a ete generee par GitHub Actions.
+          add-paths: |
+            k8s/deployment.yaml

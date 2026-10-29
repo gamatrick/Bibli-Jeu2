@@ -4,9 +4,11 @@ metadata:
   name: bibli-jeu
   namespace: bibli-jeu
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: bibli-jeu
   ports:
     - port: 80
       targetPort: 8080
+      protocol: TCP
+      nodePort: 30084
