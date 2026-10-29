@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bibli-jeu
+  namespace: bibli-jeu
+spec:
+  type: ClusterIP
+  selector:
+    app: bibli-jeu
+  ports:
+    - port: 80
+      targetPort: 8080

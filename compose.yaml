@@ -1,0 +1,21 @@
+
+services:
+  bibli-jeu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bibli-jeu2:local
+    container_name: bibli-jeu2
+    ports:
+      - "8083:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:h2:file:/app/data/bibliotheque
+      SPRING_DATASOURCE_USERNAME: sa
+      SPRING_DATASOURCE_PASSWORD: ""
+      RAWG_API_KEY: ${RAWG_API_KEY:-}
+    volumes:
+      - bibli-jeu-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  bibli-jeu-data:
